@@ -115,7 +115,7 @@ impl<'a> TreeCursor<'a> {
             .find_map(|range| (range.start == search_range.start).then_some(range.layer_id))
     }
 
-    fn goto_first_child_impl(&mut self, named: bool) -> bool {
+    fn goto_child_impl(&mut self, named: bool, last: bool) -> bool {
         // Check if the current node's range is an exact injection layer range.
         if let Some(layer_id) = self
             .layer_id_of_byte_range(self.node().byte_range())
@@ -127,10 +127,16 @@ impl<'a> TreeCursor<'a> {
             return true;
         }
 
-        let child = if named {
-            self.cursor.named_child(0)
+        let index = if last {
+            self.cursor.child_count() - 1
         } else {
-            self.cursor.child(0)
+            0
+        };
+
+        let child = if named {
+            self.cursor.named_child(index)
+        } else {
+            self.cursor.child(index)
         };
 
         if let Some(child) = child {
@@ -143,11 +149,19 @@ impl<'a> TreeCursor<'a> {
     }
 
     pub fn goto_first_child(&mut self) -> bool {
-        self.goto_first_child_impl(false)
+        self.goto_child_impl(false, false)
     }
 
     pub fn goto_first_named_child(&mut self) -> bool {
-        self.goto_first_child_impl(true)
+        self.goto_child_impl(true, false)
+    }
+
+    pub fn goto_last_child(&mut self) -> bool {
+        self.goto_child_impl(false, true)
+    }
+
+    pub fn goto_last_named_child(&mut self) -> bool {
+        self.goto_child_impl(true, true)
     }
 
     fn goto_next_sibling_impl(&mut self, named: bool) -> bool {
@@ -253,7 +267,7 @@ impl<'n> Iterator for ChildIter<'n> {
         // first iteration, just visit the first child
         if self.cursor.node() == self.parent {
             self.cursor
-                .goto_first_child_impl(self.named)
+                .goto_child_impl(self.named, false)
                 .then(|| self.cursor.node())
         } else {
             self.cursor

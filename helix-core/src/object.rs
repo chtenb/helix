@@ -36,22 +36,6 @@ pub fn shrink_selection(syntax: &Syntax, text: RopeSlice, selection: Selection) 
     )
 }
 
-pub fn select_next_sibling(syntax: &Syntax, text: RopeSlice, selection: Selection) -> Selection {
-    select_node_impl(
-        syntax,
-        text,
-        selection,
-        |cursor| {
-            while !cursor.goto_next_sibling() {
-                if !cursor.goto_parent() {
-                    break;
-                }
-            }
-        },
-        Some(Direction::Forward),
-    )
-}
-
 pub fn select_all_siblings(syntax: &Syntax, text: RopeSlice, selection: Selection) -> Selection {
     selection.transform_iter(|range| {
         let mut cursor = syntax.walk();
@@ -90,6 +74,22 @@ fn select_children<'n>(
     } else {
         vec![range]
     }
+}
+
+pub fn select_next_sibling(syntax: &Syntax, text: RopeSlice, selection: Selection) -> Selection {
+    select_node_impl(
+        syntax,
+        text,
+        selection,
+        |cursor| {
+            while !cursor.goto_next_sibling() {
+                if !cursor.goto_parent() {
+                    break;
+                }
+            }
+        },
+        Some(Direction::Forward),
+    )
 }
 
 pub fn select_prev_sibling(syntax: &Syntax, text: RopeSlice, selection: Selection) -> Selection {
