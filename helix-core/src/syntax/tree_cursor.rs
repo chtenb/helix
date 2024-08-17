@@ -127,6 +127,9 @@ impl<'a> TreeCursor<'a> {
             return true;
         }
 
+        if self.cursor.child_count() <= 0 {
+            return false;
+        }
         let index = if last {
             self.cursor.child_count() - 1
         } else {

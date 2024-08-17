@@ -108,6 +108,42 @@ pub fn select_prev_sibling(syntax: &Syntax, text: RopeSlice, selection: Selectio
     )
 }
 
+pub fn select_next_dfs(syntax: &Syntax, text: RopeSlice, selection: Selection) -> Selection {
+    select_node_impl(
+        syntax,
+        text,
+        selection,
+        |cursor| {
+            if !cursor.goto_first_child() {
+                while !cursor.goto_next_sibling() {
+                    if !cursor.goto_parent() {
+                        break;
+                    }
+                }
+            }
+        },
+        Some(Direction::Backward),
+    )
+}
+
+pub fn select_prev_dfs(syntax: &Syntax, text: RopeSlice, selection: Selection) -> Selection {
+    select_node_impl(
+        syntax,
+        text,
+        selection,
+        |cursor| {
+            if !cursor.goto_last_child() {
+                while !cursor.goto_prev_sibling() {
+                    if !cursor.goto_parent() {
+                        break;
+                    }
+                }
+            }
+        },
+        Some(Direction::Backward),
+    )
+}
+
 fn select_node_impl<F>(
     syntax: &Syntax,
     text: RopeSlice,
