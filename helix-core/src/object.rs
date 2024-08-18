@@ -75,19 +75,19 @@ pub fn select_next_sibling(syntax: &Syntax, text: RopeSlice, selection: Selectio
         syntax,
         text,
         selection,
-        |cursor, _, depth| {
-            if depth > 0 && cursor.goto_first_child() {
-                return depth - 1;
-            } else {
-                let mut d = depth;
-                while !cursor.goto_next_sibling() {
-                    if !cursor.goto_parent() {
-                        return 0;
-                    }
-                    d += 1;
+        |cursor, byte_range, depth| {
+            let mut d = depth;
+            while !cursor.goto_next_sibling() {
+                if !cursor.goto_parent() {
+                    cursor.reset_to_byte_range(byte_range.start, byte_range.end);
+                    return depth;
                 }
-                return d;
+                d += 1;
             }
+            while d > 0 && cursor.goto_first_child() {
+                d -= 1;
+            }
+            return d;
         },
         Some(Direction::Forward),
     )
@@ -98,19 +98,19 @@ pub fn select_prev_sibling(syntax: &Syntax, text: RopeSlice, selection: Selectio
         syntax,
         text,
         selection,
-        |cursor, _, depth| {
-            if depth > 0 && cursor.goto_last_child() {
-                return depth - 1;
-            } else {
-                let mut d = depth;
-                while !cursor.goto_prev_sibling() {
-                    if !cursor.goto_parent() {
-                        return 0;
-                    }
-                    d += 1;
+        |cursor, byte_range, depth| {
+            let mut d = depth;
+            while !cursor.goto_prev_sibling() {
+                if !cursor.goto_parent() {
+                    cursor.reset_to_byte_range(byte_range.start, byte_range.end);
+                    return depth;
                 }
-                return d;
+                d += 1;
             }
+            while d > 0 && cursor.goto_last_child() {
+                d -= 1;
+            }
+            return d;
         },
         Some(Direction::Backward),
     )
@@ -135,7 +135,7 @@ where
         let byte_range = from..to;
         cursor.reset_to_byte_range(from, to);
 
-        let new_depth = motion(cursor, byte_range, range.old_tree_depth.unwrap_or(0));
+        let old_depth = motion(cursor, byte_range, range.old_tree_depth.unwrap_or(0));
 
         let node = cursor.node();
         let from = text.byte_to_char(node.start_byte());
@@ -143,7 +143,7 @@ where
 
         let mut result =
             Range::new(from, to).with_direction(direction.unwrap_or_else(|| range.direction()));
-        result.old_tree_depth = Some(new_depth);
+        result.old_tree_depth = Some(old_depth);
         return result;
     })
 }
