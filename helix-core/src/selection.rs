@@ -59,6 +59,8 @@ pub struct Range {
     /// The previous visual offset (softwrapped lines and columns) from
     /// the start of the line
     pub old_visual_position: Option<(u32, u32)>,
+    /// The previous depth of the TS traversal motions
+    pub old_tree_depth: Option<u32>,
 }
 
 impl Range {
@@ -67,6 +69,7 @@ impl Range {
             anchor,
             head,
             old_visual_position: None,
+            old_tree_depth: None,
         }
     }
 
@@ -139,6 +142,7 @@ impl Range {
             anchor: self.head,
             head: self.anchor,
             old_visual_position: self.old_visual_position,
+            old_tree_depth: self.old_tree_depth,
         }
     }
 
@@ -220,12 +224,14 @@ impl Range {
                 anchor: self.anchor.min(from),
                 head: self.head.max(to),
                 old_visual_position: None,
+                old_tree_depth: None,
             }
         } else {
             Self {
                 anchor: self.anchor.max(to),
                 head: self.head.min(from),
                 old_visual_position: None,
+                old_tree_depth: None,
             }
         }
     }
@@ -241,12 +247,14 @@ impl Range {
                 anchor: self.anchor.max(other.anchor),
                 head: self.head.min(other.head),
                 old_visual_position: None,
+                old_tree_depth: None,
             }
         } else {
             Range {
                 anchor: self.from().min(other.from()),
                 head: self.to().max(other.to()),
                 old_visual_position: None,
+                old_tree_depth: None,
             }
         }
     }
@@ -305,6 +313,11 @@ impl Range {
             } else {
                 None
             },
+            old_tree_depth: if new_anchor == self.anchor {
+                self.old_tree_depth
+            } else {
+                None
+            },
         }
     }
 
@@ -328,6 +341,7 @@ impl Range {
                 anchor: self.anchor,
                 head: next_grapheme_boundary(slice, self.head),
                 old_visual_position: self.old_visual_position,
+                old_tree_depth: self.old_tree_depth,
             }
         } else {
             *self
@@ -406,6 +420,7 @@ impl From<(usize, usize)> for Range {
             anchor,
             head,
             old_visual_position: None,
+            old_tree_depth: None,
         }
     }
 }
@@ -538,7 +553,8 @@ impl Selection {
             ranges: smallvec![Range {
                 anchor,
                 head,
-                old_visual_position: None
+                old_visual_position: None,
+                old_tree_depth: None,
             }],
             primary_index: 0,
         }

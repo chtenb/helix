@@ -487,8 +487,6 @@ impl MappableCommand {
         shrink_selection, "Shrink selection to previously expanded syntax node",
         select_next_sibling, "Select next sibling in the syntax tree",
         select_prev_sibling, "Select previous sibling the in syntax tree",
-        select_next_dfs, "Select next node the in syntax tree in the DFS order",
-        select_prev_dfs, "Select previous node the in syntax tree in the DFS order",
         select_all_siblings, "Select all siblings of the current node",
         select_all_children, "Select all children of the current node",
         jump_forward, "Jump forward on jumplist",
@@ -5034,14 +5032,6 @@ fn select_next_sibling(cx: &mut Context) {
 
 fn select_prev_sibling(cx: &mut Context) {
     select_sibling_impl(cx, object::select_prev_sibling)
-}
-
-fn select_next_dfs(cx: &mut Context) {
-    select_sibling_impl(cx, object::select_next_dfs)
-}
-
-fn select_prev_dfs(cx: &mut Context) {
-    select_sibling_impl(cx, object::select_prev_dfs)
 }
 
 fn move_node_bound_impl(cx: &mut Context, dir: Direction, movement: Movement) {
