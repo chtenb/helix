@@ -65,11 +65,11 @@ impl<'a> TreeCursor<'a> {
         self.cursor
     }
 
-    pub fn goto_parent(&mut self) -> bool {
+    pub fn goto_parent(&mut self, named: bool) -> bool {
         let current_byte_range = self.cursor.byte_range();
         while let Some(parent) = self.node().parent() {
             // If we could make a significant move, return
-            if parent.byte_range() != current_byte_range {
+            if parent.byte_range() != current_byte_range && (parent.is_named() || !named) {
                 self.cursor = parent;
                 self.normalize();
                 return true;
@@ -116,7 +116,7 @@ impl<'a> TreeCursor<'a> {
     where
         P: Fn(&Node) -> bool,
     {
-        while self.goto_parent() {
+        while self.goto_parent(false) {
             if predicate(&self.node()) {
                 return true;
             }
@@ -184,23 +184,15 @@ impl<'a> TreeCursor<'a> {
         return false;
     }
 
-    pub fn goto_first_child(&mut self) -> bool {
-        self.goto_child_impl(false, false)
+    pub fn goto_first_child(&mut self, named: bool) -> bool {
+        self.goto_child_impl(named, false)
     }
 
-    pub fn goto_first_named_child(&mut self) -> bool {
-        self.goto_child_impl(true, false)
+    pub fn goto_last_child(&mut self, named: bool) -> bool {
+        self.goto_child_impl(named, true)
     }
 
-    pub fn goto_last_child(&mut self) -> bool {
-        self.goto_child_impl(false, true)
-    }
-
-    pub fn goto_last_named_child(&mut self) -> bool {
-        self.goto_child_impl(true, true)
-    }
-
-    fn goto_next_sibling_impl(&mut self, named: bool) -> bool {
+    pub fn goto_next_sibling(&mut self, named: bool) -> bool {
         let sibling = if named {
             self.cursor.next_named_sibling()
         } else {
@@ -216,15 +208,7 @@ impl<'a> TreeCursor<'a> {
         }
     }
 
-    pub fn goto_next_sibling(&mut self) -> bool {
-        self.goto_next_sibling_impl(false)
-    }
-
-    pub fn goto_next_named_sibling(&mut self) -> bool {
-        self.goto_next_sibling_impl(true)
-    }
-
-    fn goto_prev_sibling_impl(&mut self, named: bool) -> bool {
+    pub fn goto_prev_sibling(&mut self, named: bool) -> bool {
         let sibling = if named {
             self.cursor.prev_named_sibling()
         } else {
@@ -233,18 +217,11 @@ impl<'a> TreeCursor<'a> {
 
         if let Some(sibling) = sibling {
             self.cursor = sibling;
+            self.normalize();
             true
         } else {
             false
         }
-    }
-
-    pub fn goto_prev_sibling(&mut self) -> bool {
-        self.goto_prev_sibling_impl(false)
-    }
-
-    pub fn goto_prev_named_sibling(&mut self) -> bool {
-        self.goto_prev_sibling_impl(true)
     }
 
     /// Finds the injection layer that contains the given start-end range.
@@ -307,7 +284,7 @@ impl<'n> Iterator for ChildIter<'n> {
                 .then(|| self.cursor.node())
         } else {
             self.cursor
-                .goto_next_sibling_impl(self.named)
+                .goto_next_sibling(self.named)
                 .then(|| self.cursor.node())
         }
     }

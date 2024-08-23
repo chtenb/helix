@@ -487,6 +487,8 @@ impl MappableCommand {
         shrink_selection, "Shrink selection to previously expanded syntax node",
         select_next_sibling, "Select next sibling in the syntax tree",
         select_prev_sibling, "Select previous sibling the in syntax tree",
+        select_next_named_sibling, "Select next named sibling in the syntax tree",
+        select_prev_named_sibling, "Select previous named sibling the in syntax tree",
         select_all_siblings, "Select all siblings of the current node",
         select_all_children, "Select all children of the current node",
         jump_forward, "Jump forward on jumplist",
@@ -5009,9 +5011,9 @@ fn shrink_selection(cx: &mut Context) {
     cx.editor.apply_motion(motion);
 }
 
-fn select_sibling_impl<F>(cx: &mut Context, sibling_fn: F)
+fn select_sibling_impl<F>(cx: &mut Context, sibling_fn: F, named: bool)
 where
-    F: Fn(&helix_core::Syntax, RopeSlice, Selection) -> Selection + 'static,
+    F: Fn(&helix_core::Syntax, RopeSlice, Selection, bool) -> Selection + 'static,
 {
     let motion = move |editor: &mut Editor| {
         let (view, doc) = current!(editor);
@@ -5019,7 +5021,7 @@ where
         if let Some(syntax) = doc.syntax() {
             let text = doc.text().slice(..);
             let current_selection = doc.selection(view.id);
-            let selection = sibling_fn(syntax, text, current_selection.clone());
+            let selection = sibling_fn(syntax, text, current_selection.clone(), named);
             doc.set_selection(view.id, selection);
         }
     };
@@ -5027,11 +5029,19 @@ where
 }
 
 fn select_next_sibling(cx: &mut Context) {
-    select_sibling_impl(cx, object::select_next_sibling)
+    select_sibling_impl(cx, object::select_next_sibling, false)
 }
 
 fn select_prev_sibling(cx: &mut Context) {
-    select_sibling_impl(cx, object::select_prev_sibling)
+    select_sibling_impl(cx, object::select_prev_sibling, false)
+}
+
+fn select_next_named_sibling(cx: &mut Context) {
+    select_sibling_impl(cx, object::select_next_sibling, true)
+}
+
+fn select_prev_named_sibling(cx: &mut Context) {
+    select_sibling_impl(cx, object::select_prev_sibling, true)
 }
 
 fn move_node_bound_impl(cx: &mut Context, dir: Direction, movement: Movement) {

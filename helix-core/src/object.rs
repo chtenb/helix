@@ -7,7 +7,7 @@ pub fn expand_selection(syntax: &Syntax, text: RopeSlice, selection: Selection) 
         selection,
         |cursor, byte_range, _| {
             while cursor.node().byte_range() == byte_range {
-                if !cursor.goto_parent() {
+                if !cursor.goto_parent(false) {
                     break;
                 }
             }
@@ -23,7 +23,7 @@ pub fn shrink_selection(syntax: &Syntax, text: RopeSlice, selection: Selection) 
         text,
         selection,
         |cursor, _, _| {
-            cursor.goto_first_child();
+            cursor.goto_first_child(false);
             return 0;
         },
         None,
@@ -70,22 +70,27 @@ fn select_children<'n>(
     }
 }
 
-pub fn select_next_sibling(syntax: &Syntax, text: RopeSlice, selection: Selection) -> Selection {
+pub fn select_next_sibling(
+    syntax: &Syntax,
+    text: RopeSlice,
+    selection: Selection,
+    named: bool,
+) -> Selection {
     select_node_impl(
         syntax,
         text,
         selection,
         |cursor, byte_range, depth| {
             let mut d = depth;
-            while !cursor.goto_next_sibling() {
+            while !cursor.goto_next_sibling(named) {
                 log::error!("Moving up");
-                if !cursor.goto_parent() {
+                if !cursor.goto_parent(named) {
                     cursor.reset_to_byte_range(byte_range.start, byte_range.end);
                     return depth;
                 }
                 d += 1;
             }
-            while d > 0 && cursor.goto_first_child() {
+            while d > 0 && cursor.goto_first_child(named) {
                 log::error!("Moving down");
                 d -= 1;
             }
@@ -95,22 +100,27 @@ pub fn select_next_sibling(syntax: &Syntax, text: RopeSlice, selection: Selectio
     )
 }
 
-pub fn select_prev_sibling(syntax: &Syntax, text: RopeSlice, selection: Selection) -> Selection {
+pub fn select_prev_sibling(
+    syntax: &Syntax,
+    text: RopeSlice,
+    selection: Selection,
+    named: bool,
+) -> Selection {
     select_node_impl(
         syntax,
         text,
         selection,
         |cursor, byte_range, depth| {
             let mut d = depth;
-            while !cursor.goto_prev_sibling() {
+            while !cursor.goto_prev_sibling(named) {
                 log::error!("Moving up");
-                if !cursor.goto_parent() {
+                if !cursor.goto_parent(named) {
                     cursor.reset_to_byte_range(byte_range.start, byte_range.end);
                     return depth;
                 }
                 d += 1;
             }
-            while d > 0 && cursor.goto_last_child() {
+            while d > 0 && cursor.goto_last_child(named) {
                 log::error!("Moving down");
                 d -= 1;
             }
