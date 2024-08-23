@@ -1509,6 +1509,26 @@ impl Syntax {
             .descendant_for_byte_range(start, end)
     }
 
+    pub fn greatest_descendant_for_byte_range(&self, start: usize, end: usize) -> Option<Node<'_>> {
+        self.tree_for_byte_range(start, end)
+            .root_node()
+            .descendant_for_byte_range(start, end)
+            .map(|node| {
+                let mut result = node;
+                let node_byte_range = std::ops::Range { start, end };
+                loop {
+                    if let Some(parent) = result.parent() {
+                        if parent.byte_range() == node_byte_range {
+                            result = parent;
+                            continue;
+                        }
+                    }
+                    break;
+                }
+                result
+            })
+    }
+
     pub fn walk(&self) -> TreeCursor<'_> {
         // data structure to find the smallest range that contains a point
         // when some of the ranges in the structure can overlap.

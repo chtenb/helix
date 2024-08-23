@@ -66,9 +66,16 @@ impl<'a> TreeCursor<'a> {
     }
 
     pub fn goto_parent(&mut self) -> bool {
-        if let Some(parent) = self.node().parent() {
+        let current_byte_range = self.cursor.byte_range();
+        while let Some(parent) = self.node().parent() {
+            // If we could make a significant move, return
+            if parent.byte_range() != current_byte_range {
+                self.cursor = parent;
+                self.normalize();
+                return true;
+            }
+            // Otherwise recurse while possible
             self.cursor = parent;
-            return true;
         }
 
         // If we are already on the root layer, we cannot ascend.
@@ -82,12 +89,27 @@ impl<'a> TreeCursor<'a> {
             .parent
             .expect("non-root layers have a parent");
         self.current = parent_id;
-        let root = self.layers[self.current].tree().root_node();
-        self.cursor = root
-            .descendant_for_byte_range(range.start, range.end)
-            .unwrap_or(root);
-
+        self.set_descendant_for_byte_range(range.start, range.end);
         true
+    }
+
+    fn set_descendant_for_byte_range(&mut self, start: usize, end: usize) {
+        let root = self.layers[self.current].tree().root_node();
+        self.cursor = root.descendant_for_byte_range(start, end).unwrap_or(root);
+        self.normalize();
+    }
+
+    fn normalize(&mut self) {
+        let node_byte_range = self.node().byte_range();
+        loop {
+            if let Some(parent) = self.node().parent() {
+                if parent.byte_range() == node_byte_range {
+                    self.cursor = parent;
+                    continue;
+                }
+            }
+            break;
+        }
     }
 
     pub fn goto_parent_with<P>(&mut self, predicate: P) -> bool
@@ -124,6 +146,7 @@ impl<'a> TreeCursor<'a> {
             // Switch to the child layer.
             self.current = layer_id;
             self.cursor = self.layers[self.current].tree().root_node();
+            self.normalize();
             return true;
         }
 
@@ -136,19 +159,29 @@ impl<'a> TreeCursor<'a> {
             0
         };
 
-        let child = if named {
+        // let child = if named {
+        //     self.cursor.named_child(index)
+        // } else {
+        //     self.cursor.child(index)
+        // };
+
+        // Otherwise descend in the current tree.
+        let current_byte_range = self.cursor.byte_range();
+        while let Some(child) = if named {
             self.cursor.named_child(index)
         } else {
             self.cursor.child(index)
-        };
-
-        if let Some(child) = child {
-            // Otherwise descend in the current tree.
+        } {
+            // If we could make a significant move, return
+            if child.byte_range() != current_byte_range {
+                self.cursor = child;
+                self.normalize();
+                return true;
+            }
+            // Otherwise recurse while possible
             self.cursor = child;
-            true
-        } else {
-            false
         }
+        return false;
     }
 
     pub fn goto_first_child(&mut self) -> bool {
@@ -176,6 +209,7 @@ impl<'a> TreeCursor<'a> {
 
         if let Some(sibling) = sibling {
             self.cursor = sibling;
+            self.normalize();
             true
         } else {
             false
@@ -228,8 +262,7 @@ impl<'a> TreeCursor<'a> {
 
     pub fn reset_to_byte_range(&mut self, start: usize, end: usize) {
         self.current = self.layer_id_containing_byte_range(start, end);
-        let root = self.layers[self.current].tree().root_node();
-        self.cursor = root.descendant_for_byte_range(start, end).unwrap_or(root);
+        self.set_descendant_for_byte_range(start, end);
     }
 
     /// Returns an iterator over the children of the node the TreeCursor is on

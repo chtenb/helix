@@ -78,6 +78,7 @@ pub fn select_next_sibling(syntax: &Syntax, text: RopeSlice, selection: Selectio
         |cursor, byte_range, depth| {
             let mut d = depth;
             while !cursor.goto_next_sibling() {
+                log::error!("Moving up");
                 if !cursor.goto_parent() {
                     cursor.reset_to_byte_range(byte_range.start, byte_range.end);
                     return depth;
@@ -85,6 +86,7 @@ pub fn select_next_sibling(syntax: &Syntax, text: RopeSlice, selection: Selectio
                 d += 1;
             }
             while d > 0 && cursor.goto_first_child() {
+                log::error!("Moving down");
                 d -= 1;
             }
             return d;
@@ -101,6 +103,7 @@ pub fn select_prev_sibling(syntax: &Syntax, text: RopeSlice, selection: Selectio
         |cursor, byte_range, depth| {
             let mut d = depth;
             while !cursor.goto_prev_sibling() {
+                log::error!("Moving up");
                 if !cursor.goto_parent() {
                     cursor.reset_to_byte_range(byte_range.start, byte_range.end);
                     return depth;
@@ -108,6 +111,7 @@ pub fn select_prev_sibling(syntax: &Syntax, text: RopeSlice, selection: Selectio
                 d += 1;
             }
             while d > 0 && cursor.goto_last_child() {
+                log::error!("Moving down");
                 d -= 1;
             }
             return d;
@@ -136,6 +140,7 @@ where
         cursor.reset_to_byte_range(from, to);
 
         let old_depth = motion(cursor, byte_range, range.old_tree_depth.unwrap_or(0));
+        log::error!("depth: {}", old_depth);
 
         let node = cursor.node();
         let from = text.byte_to_char(node.start_byte());
