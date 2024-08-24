@@ -4973,7 +4973,9 @@ fn expand_selection(cx: &mut Context) {
             let text = doc.text().slice(..);
 
             let current_selection = doc.selection(view.id);
-            let selection = object::expand_selection(syntax, text, current_selection.clone());
+            let selection = current_selection
+                .clone()
+                .transform(|range| object::expand_selection(syntax, text, range));
 
             // check if selection is different from the last one
             if *current_selection != selection {
@@ -5004,7 +5006,9 @@ fn shrink_selection(cx: &mut Context) {
         // if not previous selection, shrink to first child
         if let Some(syntax) = doc.syntax() {
             let text = doc.text().slice(..);
-            let selection = object::shrink_selection(syntax, text, current_selection.clone());
+            let selection = current_selection
+                .clone()
+                .transform(|range| object::shrink_selection(syntax, text, range));
             doc.set_selection(view.id, selection);
         }
     };
@@ -5013,7 +5017,7 @@ fn shrink_selection(cx: &mut Context) {
 
 fn select_sibling_impl<F>(cx: &mut Context, sibling_fn: F, named: bool)
 where
-    F: Fn(&helix_core::Syntax, RopeSlice, Selection, bool) -> Selection + 'static,
+    F: Fn(&helix_core::Syntax, RopeSlice, Range, bool) -> Range + 'static,
 {
     let motion = move |editor: &mut Editor| {
         let (view, doc) = current!(editor);
@@ -5021,7 +5025,9 @@ where
         if let Some(syntax) = doc.syntax() {
             let text = doc.text().slice(..);
             let current_selection = doc.selection(view.id);
-            let selection = sibling_fn(syntax, text, current_selection.clone(), named);
+            let selection = current_selection
+                .clone()
+                .transform(|range| sibling_fn(syntax, text, range, named));
             doc.set_selection(view.id, selection);
         }
     };

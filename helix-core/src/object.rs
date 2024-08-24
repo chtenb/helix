@@ -1,10 +1,10 @@
 use crate::{movement::Direction, syntax::TreeCursor, Range, RopeSlice, Selection, Syntax};
 
-pub fn expand_selection(syntax: &Syntax, text: RopeSlice, selection: Selection) -> Selection {
+pub fn expand_selection(syntax: &Syntax, text: RopeSlice, range: Range) -> Range {
     select_node_impl(
         syntax,
         text,
-        selection,
+        range,
         |cursor, byte_range, _| {
             while cursor.node().byte_range() == byte_range {
                 if !cursor.goto_parent(false) {
@@ -17,11 +17,11 @@ pub fn expand_selection(syntax: &Syntax, text: RopeSlice, selection: Selection) 
     )
 }
 
-pub fn shrink_selection(syntax: &Syntax, text: RopeSlice, selection: Selection) -> Selection {
+pub fn shrink_selection(syntax: &Syntax, text: RopeSlice, range: Range) -> Range {
     select_node_impl(
         syntax,
         text,
-        selection,
+        range,
         |cursor, _, _| {
             cursor.goto_first_child(false);
             return 0;
@@ -70,16 +70,11 @@ fn select_children<'n>(
     }
 }
 
-pub fn select_next_sibling(
-    syntax: &Syntax,
-    text: RopeSlice,
-    selection: Selection,
-    named: bool,
-) -> Selection {
+pub fn select_next_sibling(syntax: &Syntax, text: RopeSlice, range: Range, named: bool) -> Range {
     select_node_impl(
         syntax,
         text,
-        selection,
+        range,
         |cursor, byte_range, depth| {
             let mut d = depth;
             while !cursor.goto_next_sibling(named) {
@@ -100,16 +95,11 @@ pub fn select_next_sibling(
     )
 }
 
-pub fn select_prev_sibling(
-    syntax: &Syntax,
-    text: RopeSlice,
-    selection: Selection,
-    named: bool,
-) -> Selection {
+pub fn select_prev_sibling(syntax: &Syntax, text: RopeSlice, range: Range, named: bool) -> Range {
     select_node_impl(
         syntax,
         text,
-        selection,
+        range,
         |cursor, byte_range, depth| {
             let mut d = depth;
             while !cursor.goto_prev_sibling(named) {
@@ -133,32 +123,30 @@ pub fn select_prev_sibling(
 fn select_node_impl<F>(
     syntax: &Syntax,
     text: RopeSlice,
-    selection: Selection,
+    range: Range,
     motion: F,
     direction: Option<Direction>,
-) -> Selection
+) -> Range
 where
     F: Fn(&mut TreeCursor, std::ops::Range<usize>, u32) -> u32,
 {
     let cursor = &mut syntax.walk();
 
-    selection.transform(|range| {
-        let from = text.char_to_byte(range.from());
-        let to = text.char_to_byte(range.to());
+    let from = text.char_to_byte(range.from());
+    let to = text.char_to_byte(range.to());
 
-        let byte_range = from..to;
-        cursor.reset_to_byte_range(from, to);
+    let byte_range = from..to;
+    cursor.reset_to_byte_range(from, to);
 
-        let old_depth = motion(cursor, byte_range, range.old_tree_depth.unwrap_or(0));
-        log::error!("depth: {}", old_depth);
+    let old_depth = motion(cursor, byte_range, range.old_tree_depth.unwrap_or(0));
+    log::error!("depth: {}", old_depth);
 
-        let node = cursor.node();
-        let from = text.byte_to_char(node.start_byte());
-        let to = text.byte_to_char(node.end_byte());
+    let node = cursor.node();
+    let from = text.byte_to_char(node.start_byte());
+    let to = text.byte_to_char(node.end_byte());
 
-        let mut result =
-            Range::new(from, to).with_direction(direction.unwrap_or_else(|| range.direction()));
-        result.old_tree_depth = Some(old_depth);
-        return result;
-    })
+    let mut result =
+        Range::new(from, to).with_direction(direction.unwrap_or_else(|| range.direction()));
+    result.old_tree_depth = Some(old_depth);
+    return result;
 }
