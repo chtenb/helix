@@ -4975,7 +4975,7 @@ fn expand_selection(cx: &mut Context) {
             let current_selection = doc.selection(view.id);
             let selection = current_selection
                 .clone()
-                .transform(|range| object::expand_selection(syntax, text, range));
+                .transform(|range| object::expand_selection(syntax, text, range, false));
 
             // check if selection is different from the last one
             if *current_selection != selection {
@@ -5008,26 +5008,67 @@ fn shrink_selection(cx: &mut Context) {
             let text = doc.text().slice(..);
             let selection = current_selection
                 .clone()
-                .transform(|range| object::shrink_selection(syntax, text, range));
+                .transform(|range| object::shrink_selection(syntax, text, range, false, false));
             doc.set_selection(view.id, selection);
         }
     };
     cx.editor.apply_motion(motion);
 }
 
-fn select_sibling_impl<F>(cx: &mut Context, sibling_fn: F, named: bool)
-where
-    F: Fn(&helix_core::Syntax, RopeSlice, Range, bool) -> Range + 'static,
-{
+fn select_sibling_impl(cx: &mut Context, direction: Direction, named: bool) {
+    let sibling_fn = if direction == Direction::Forward {
+        object::select_next_sibling
+    } else {
+        object::select_prev_sibling
+    };
     let motion = move |editor: &mut Editor| {
         let (view, doc) = current!(editor);
 
         if let Some(syntax) = doc.syntax() {
             let text = doc.text().slice(..);
             let current_selection = doc.selection(view.id);
-            let selection = current_selection
-                .clone()
-                .transform(|range| sibling_fn(syntax, text, range, named));
+            let selection = current_selection.clone().transform(|range| {
+                let mut result = range.clone();
+                let mut d = result.old_tree_depth.unwrap_or(0);
+                let mut new_range: Range;
+                loop {
+                    new_range = sibling_fn(syntax, text, result, named);
+                    if result != new_range {
+                        break;
+                    } else {
+                        new_range = object::expand_selection(syntax, text, result, named);
+                        if result != new_range {
+                            result = new_range;
+                            d += 1;
+                            log::info!("Moving up");
+                            continue;
+                        } else {
+                            return range;
+                        }
+                    }
+                }
+
+                while d > 0 {
+                    new_range = object::shrink_selection(
+                        syntax,
+                        text,
+                        result,
+                        named,
+                        direction == Direction::Backward,
+                    );
+                    if result != new_range {
+                        result = new_range;
+                        d -= 1;
+                        log::info!("Moving down");
+                        continue;
+                    } else {
+                        break;
+                    }
+                }
+
+                result.old_tree_depth = Some(d);
+                return result;
+            });
             doc.set_selection(view.id, selection);
         }
     };
@@ -5035,19 +5076,19 @@ where
 }
 
 fn select_next_sibling(cx: &mut Context) {
-    select_sibling_impl(cx, object::select_next_sibling, false)
+    select_sibling_impl(cx, Direction::Forward, false)
 }
 
 fn select_prev_sibling(cx: &mut Context) {
-    select_sibling_impl(cx, object::select_prev_sibling, false)
+    select_sibling_impl(cx, Direction::Backward, false)
 }
 
 fn select_next_named_sibling(cx: &mut Context) {
-    select_sibling_impl(cx, object::select_next_sibling, true)
+    select_sibling_impl(cx, Direction::Forward, true)
 }
 
 fn select_prev_named_sibling(cx: &mut Context) {
-    select_sibling_impl(cx, object::select_prev_sibling, true)
+    select_sibling_impl(cx, Direction::Backward, true)
 }
 
 fn move_node_bound_impl(cx: &mut Context, dir: Direction, movement: Movement) {

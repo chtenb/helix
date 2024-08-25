@@ -1,30 +1,43 @@
 use crate::{movement::Direction, syntax::TreeCursor, Range, RopeSlice, Selection, Syntax};
 
-pub fn expand_selection(syntax: &Syntax, text: RopeSlice, range: Range) -> Range {
+pub fn expand_selection(syntax: &Syntax, text: RopeSlice, range: Range, named: bool) -> Range {
     select_node_impl(
         syntax,
         text,
         range,
-        |cursor, byte_range, _| {
+        |cursor, byte_range| {
             while cursor.node().byte_range() == byte_range {
-                if !cursor.goto_parent(false) {
+                if !cursor.goto_parent(named) {
                     break;
                 }
             }
-            return 0;
         },
         None,
     )
 }
 
-pub fn shrink_selection(syntax: &Syntax, text: RopeSlice, range: Range) -> Range {
+pub fn shrink_selection(
+    syntax: &Syntax,
+    text: RopeSlice,
+    range: Range,
+    named: bool,
+    last: bool,
+) -> Range {
     select_node_impl(
         syntax,
         text,
         range,
-        |cursor, _, _| {
-            cursor.goto_first_child(false);
-            return 0;
+        |cursor, byte_range| {
+            let child_fn = if last {
+                TreeCursor::goto_last_child
+            } else {
+                TreeCursor::goto_first_child
+            };
+            while cursor.node().byte_range() == byte_range {
+                if !child_fn(cursor, named) {
+                    break;
+                }
+            }
         },
         None,
     )
@@ -75,21 +88,12 @@ pub fn select_next_sibling(syntax: &Syntax, text: RopeSlice, range: Range, named
         syntax,
         text,
         range,
-        |cursor, byte_range, depth| {
-            let mut d = depth;
-            while !cursor.goto_next_sibling(named) {
-                log::error!("Moving up");
-                if !cursor.goto_parent(named) {
-                    cursor.reset_to_byte_range(byte_range.start, byte_range.end);
-                    return depth;
+        |cursor, byte_range| {
+            while cursor.node().byte_range() == byte_range {
+                if !cursor.goto_next_sibling(named) {
+                    break;
                 }
-                d += 1;
             }
-            while d > 0 && cursor.goto_first_child(named) {
-                log::error!("Moving down");
-                d -= 1;
-            }
-            return d;
         },
         Some(Direction::Forward),
     )
@@ -100,21 +104,12 @@ pub fn select_prev_sibling(syntax: &Syntax, text: RopeSlice, range: Range, named
         syntax,
         text,
         range,
-        |cursor, byte_range, depth| {
-            let mut d = depth;
-            while !cursor.goto_prev_sibling(named) {
-                log::error!("Moving up");
-                if !cursor.goto_parent(named) {
-                    cursor.reset_to_byte_range(byte_range.start, byte_range.end);
-                    return depth;
+        |cursor, byte_range| {
+            while cursor.node().byte_range() == byte_range {
+                if !cursor.goto_prev_sibling(named) {
+                    break;
                 }
-                d += 1;
             }
-            while d > 0 && cursor.goto_last_child(named) {
-                log::error!("Moving down");
-                d -= 1;
-            }
-            return d;
         },
         Some(Direction::Backward),
     )
@@ -128,7 +123,7 @@ fn select_node_impl<F>(
     direction: Option<Direction>,
 ) -> Range
 where
-    F: Fn(&mut TreeCursor, std::ops::Range<usize>, u32) -> u32,
+    F: Fn(&mut TreeCursor, std::ops::Range<usize>),
 {
     let cursor = &mut syntax.walk();
 
@@ -138,15 +133,11 @@ where
     let byte_range = from..to;
     cursor.reset_to_byte_range(from, to);
 
-    let old_depth = motion(cursor, byte_range, range.old_tree_depth.unwrap_or(0));
-    log::error!("depth: {}", old_depth);
+    motion(cursor, byte_range);
 
     let node = cursor.node();
     let from = text.byte_to_char(node.start_byte());
     let to = text.byte_to_char(node.end_byte());
 
-    let mut result =
-        Range::new(from, to).with_direction(direction.unwrap_or_else(|| range.direction()));
-    result.old_tree_depth = Some(old_depth);
-    return result;
+    Range::new(from, to).with_direction(direction.unwrap_or_else(|| range.direction()))
 }
